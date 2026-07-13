@@ -1,0 +1,14 @@
+# --- Phase 1 (Review Enrichment) — in use now ---
+fastapi>=0.111
+uvicorn[standard]>=0.30
+pydantic>=2.7
+pandas>=2.2
+numpy>=1.26
+python-dotenv>=1.0
+google-genai>=1.0
+
+# --- Phase 2/3 — no new deps expected beyond the above ---
+
+# --- Phase 4 (Dashboard) — not used until then ---
+streamlit>=1.35
+plotly>=5.22

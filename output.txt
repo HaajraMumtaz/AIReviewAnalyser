@@ -1,0 +1,266 @@
+"""
+src/analytics/business_impact.py
+
+Phase 2 subtask 2 — Business Impact Score.
+
+Computes one BusinessImpactScore per issue using the shared
+IssuePattern objects and grouped review data prepared by
+AnalyticsEngine.
+
+Score =
+100 * (
+    0.35 * frequency +
+    0.30 * negative sentiment +
+    0.20 * evidence +
+    0.15 * rating penalty
+)
+
+The score represents operational impact rather than simply rating
+impact. It intentionally differs from RatingDriver, which measures
+how strongly an issue lowers café ratings.
+"""
+
+dependencies:
+from src.models.schema import BusinessImpactScore, EnrichedReview, IssuePattern, Sentiment
+
+def build_business_impact_scores()
+----------------------------------------------------------------
+"""
+src/analytics/customer_love.py
+
+Phase 2 subtask 4 — Customer Love.
+
+Two related-but-distinct aggregates, both built here since they share
+a grouping pass over the same reviews and both feed downstream Phase 2
+modules:
+
+    build_customer_loved_attributes()
+        Freeform praise text (`brand_attributes` + `positive_points`)
+        grouped by normalized attribute string. Backs the dashboard's
+        "Customer Love" panel and the Marketing Gap's attribute half.
+
+    build_product_performance()
+        Praised-and-criticized performance per canonical coffee/beverage
+        `product_category`. Backs the dashboard's "Product Performance"
+        section, and is the shared input `hidden_gems.py` and
+        `marketing_gap.py` both consume.
+"""
+
+dependencies:
+from src.models.schema import CustomerLovedAttribute, EnrichedReview, ProductCategory, ProductPerformance, Sentiment
+
+class CustomerLove:
+
+def build_customer_love()
+def build_customer_loved_attributes()
+def build_product_performance()"""
+src/analytics/engine.py
+----------------------------------------------------------------------
+Phase 2 — Analytics Engine.
+
+Single orchestration layer for deterministic coffee analytics pipeline.
+"""
+
+dependencies:
+from src.analytics.business_impact import build_business_impact_scores
+from src.analytics.customer_love import build_customer_love
+from src.analytics.hidden_gems import build_hidden_gems
+from src.analytics.marketing_gap import build_marketing_gap
+from src.analytics.patterns import build_issue_patterns, group_by_issue
+from src.analytics.rating_driver import build_rating_drivers
+from src.models.schema import AnalyticsResult, EnrichedReview, InstagramPost
+
+class AnalyticsEngine:
+    def run()
+"""
+src/analytics/hidden_gems.py
+
+Phase 2 subtask 5 — Hidden Gems.
+
+architecture.md: high positive sentiment, low mention volume. Consumes
+the same `ProductPerformance` list `marketing_gap.py` uses (built once
+in `customer_love.py`) rather than re-deriving it.
+
+This surfaces low-volume/high-praise drink lines (e.g., a highly rated
+but rarely reviewed 'Matcha' or 'Iced Tea' category). If a café has no
+qualifying low-volume/high-praise product, it returns an empty list.
+"""
+-----------------------------------------------------------------------------
+dependencies:
+from src.models.schema import EnrichedReview, HiddenGem, ProductCategory, ProductPerformance, Sentiment
+
+def build_hidden_gems()"""
+
+--------------------------------------------------------------------------
+src/analytics/marketing_gap.py
+
+Phase 2 subtask 6 — Marketing Gap.
+
+Compares what café customers love against what actually gets marketed
+on Instagram using deterministic keyword parsing over `InstagramPost.caption`
+and `hashtags`.
+
+Answers executive question: "What customer-loved coffee categories are
+we under-marketing on social media?"
+"""
+
+dependencies:
+from src.models.schema import InstagramPost, MarketingGap, ProductCategory, ProductPerformance
+
+def _keyword_for()
+def _post_mentions_category()
+def build_marketing_gap()"""
+
+---------------------------------------------------------------------------------------
+src/analytics/patterns.py
+Phase 2 subtask 1 — Issue Analytics.
+
+Builds one IssuePattern per distinct issue label present in the
+enriched reviews: frequency, peak day/bar-period, weekend share,
+affected coffee lines, and platform/day breakdowns.
+"""
+
+dependencies:
+from src.models.schema import EnrichedReview, IssuePattern
+
+def group_by_issue()
+def build_issue_patterns()
+-----------------------------------------------------------------
+src/analytics/rating_driver.py
+
+Phase 2 subtask 3 — Rating Driver Analysis.
+
+For each issue: average rating of reviews carrying that issue vs.
+average rating of every other review. Helps isolate what operational problems
+are causing the biggest drops in customer satisfaction at the espresso bar.
+"""
+
+dependencies:
+from src.models.schema import EnrichedReview, IssuePattern, RatingDriver
+
+def build_rating_drivers()
+---------------------------------------------------------------------
+"""
+src/services/enrichment_service.py
+
+Phase 1 — the enrichment pipeline itself:
+
+    load reviews
+        -> filter processed == FALSE
+        -> Gemini enrichment
+        -> validate
+        -> product normalization
+        -> meal period
+        -> evidence weight
+        -> mark processed
+        -> save
+
+No analytics or dashboard logic lives here — only what's needed to
+turn RawReview rows into EnrichedReview rows and persist both files.
+"""
+
+dependencies:
+from src.ai.gemini_client import GeminiClient, GeminiClientError
+from src.models.schema import EnrichedReview, MealPeriod, ProductCategory, RawReview
+from src.storage.schema import ReviewsSchema
+from src.utils.validation import EnrichmentValidationError, validate_gemini_response
+
+def normalize_products()
+class EnrichmentFailure:
+
+class EnrichmentResult:
+
+class EnrichmentService:
+    def __init__()
+    def run()
+    def _build_enriched_review()
+    def _read_reviews()
+    def _read_enriched_rows()
+    def _write_reviews()
+    def _write_enriched()
+    def _enriched_to_row()
+"""
+------------------------------------------------------------------
+src/utils/validation.py
+
+Phase 1 — validates every Gemini response before it is saved.
+
+This module owns exactly one job: turn a raw dict (whatever
+`GeminiClient.enrich_review` handed back after JSON-parsing the model's
+output) into a trustworthy `GeminiExtractedFields`, or raise a clear,
+specific error if it can't. No enrichment orchestration, no CSV I/O,
+no product normalization — that's `enrichment_service.py`'s job.
+"""
+
+dependencies:
+from src.models.schema import GeminiExtractedFields
+
+class EnrichmentValidationError:
+
+def validate_gemini_response()
+----------------------------------------------------------
+
+src tree
+D:.
+│   main.py
+│   README.md
+│   requirements.txt
+│   __init__.py
+│   
+├───ai
+│   │   gemini_client.py
+│   │   __init__.py
+│   │   
+│   └───__pycache__
+│           gemini_client.cpython-312.pyc
+│           __init__.cpython-312.pyc
+│           
+├───analytics
+│       business_impact.py
+│       customer_love.py
+│       engine.py
+│       hidden_gems.py
+│       marketing_gap.py
+│       patterns.py
+│       rating_driver.py
+│       
+├───api
+│       analytics_router.py
+│       enrichment_router.py
+│       __init__.py
+│       
+├───models
+│   │   schema.py
+│   │   __init__.py
+│   │   
+│   └───__pycache__
+│           schema.cpython-312.pyc
+│           __init__.cpython-312.pyc
+│           
+├───services
+│   │   enrichment_service.py
+│   │   __init__.py
+│   │   
+│   └───__pycache__
+│           enrichment_service.cpython-312.pyc
+│           __init__.cpython-312.pyc
+│           
+├───storage
+│   │   schema.py
+│   │   __init__.py
+│   │   
+│   └───__pycache__
+│           schema.cpython-312.pyc
+│           __init__.cpython-312.pyc
+│           
+├───utils
+│   │   validation.py
+│   │   __init__.py
+│   │   
+│   └───__pycache__
+│           validation.cpython-312.pyc
+│           __init__.cpython-312.pyc
+│           
+└───__pycache__
+        __init__.cpython-312.pyc
+        
